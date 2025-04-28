@@ -1,0 +1,10 @@
+*.RData
+*.rds
+*.Rhistory
+.Rproj.user/
+slurm_output/
+*.log
+*.aux
+*.out
+*.toc
+ACIC/
