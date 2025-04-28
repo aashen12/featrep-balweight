@@ -77,7 +77,10 @@ eval_data <- function(dat, treat.true = 5, verbose = FALSE) {
     bw_inf <- balancingWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, type = "inf", verbose = FALSE)
     ipw <- logisticIPW(data = dataset, true_att = treat.true, feat_rep = feat_rep, verbose = FALSE)
     aug.l2 <- augmentedBalWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, out.mod = "ridge", ps.mod = "l2", verbose = FALSE)
-    list(bw_l2 = bw_l2, bw_inf = bw_inf, ipw = ipw, aug.l2 = aug.l2)
+    aug.inf <- augmentedBalWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, out.mod = "lasso", ps.mod = "inf", verbose = FALSE)
+    aug.vanilla <- augmentedBalWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, out.mod = "ols", ps.mod = "ipw", verbose = FALSE)
+    list(bw_l2 = bw_l2, bw_inf = bw_inf, ipw = ipw, 
+         aug.l2 = aug.l2, aug.inf = aug.inf, aug.vanilla = aug.vanilla)
   })
   out
 }

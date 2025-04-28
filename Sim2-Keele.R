@@ -68,7 +68,7 @@ run_scenario = function( c ) {
   # Run the Simulation              
   reps_qs0 = map( 1:sim_reps, function( id ) {
     if (id %% 100 == 0) print(paste("Starting simulation", id))
-    bdat  = make_data( 1000, c = c, treat.true=5 )
+    bdat  = make_data( 2000, c = c, treat.true=5 )
     edat = eval_data(dat=bdat, treat.true=5, verbose = FALSE)
     #edat$id = id
     #edat
@@ -91,7 +91,7 @@ t_fexact <- system.time({
 })
 
 save(scenarios, file="simulation-2-keele.RData")
-cat("saved file")
+print("saved file")
 
 # time required for computation, in minutes
 time <- t_fexact[['elapsed']]/60
