@@ -4,7 +4,7 @@
 #SBATCH --output=slurm_output/%x_%j.o  # Output file
 #SBATCH --error=slurm_output/%x_%j.e   # Error file
 #SBATCH -c 5
-#SBATCH -p yss
+#SBATCH -p high
 
 # Run the R script
 Rscript Sim2-Keele.R

@@ -8,6 +8,7 @@ library(GenericML)
 library(WeightIt)
 library(glmnet)
 library(optweight)
+library(kbal)
 
 
 library(doFuture)
@@ -67,9 +68,10 @@ run_scenario = function( c ) {
   
   # Run the Simulation              
   reps_qs0 = map( 1:sim_reps, function( id ) {
-    if (id %% 100 == 0) print(paste("Starting simulation", id))
-    bdat  = make_data( 2000, c = c, treat.true=5 )
-    edat = eval_data(dat=bdat, treat.true=5, verbose = FALSE)
+    if (id %% 20 == 0) cat(paste("Starting simulation", id, "for overlap", c, "at", Sys.time(), "\n"), file = "sim2-keele.txt", append = TRUE)
+    bdat  = make_data( 1000, c = c, treat.true=5 )
+    pilot.dat <- make_data(200, c=c, treat.true=5 ) %>% dplyr::filter(Z == 0)
+    edat = eval_data(dat=bdat, pilot.dat=pilot.dat, treat.true=5, verbose = FALSE)
     #edat$id = id
     #edat
     out <- lapply(1:length(edat), function(i) {
@@ -78,8 +80,9 @@ run_scenario = function( c ) {
     })
     dplyr::bind_rows(out) %>% dplyr::mutate(id = id)
   }) 
-  dplyr::bind_rows(reps_qs0)
+  
   cat(paste0("Sim ", c, " done\n"), file = "sim2-keele.txt", append = TRUE)
+  dplyr::bind_rows(reps_qs0)
 }
 
 

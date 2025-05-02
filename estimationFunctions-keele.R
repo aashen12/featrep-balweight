@@ -151,26 +151,26 @@ balancingWeights <- function(data, true_att, feat_rep, type = "l2", verbose = FA
     print("PBR calculated")
   }
   
-  ## Balance Subset
-  rownames(um.wt.tab) <- bal.names
-  rownames(bal.st.tab) <- bal.names
-  
-  lg.un <-  um.wt.tab[which(abs(um.wt.tab[,3]) > 0.2),] # large unweighted (0.2)
-  lg.wt <- bal.st.tab[which(abs(um.wt.tab[,3]) > 0.2),]
-  
-  ### Plots and Tables
-  n_covs <- nrow(lg.un)
-  # var_names <- covs[covs != "-1"] # use if plotting all covariates
-  all(row.names(lg.un) == row.names(lg.wt))
-  var_names <- rownames(lg.un)
-  
-  #### Balance Plot
-  data.plot <- c(lg.un[,3], lg.wt[,3])
-  data.plot <- as.data.frame(data.plot)
-  names(data.plot) <- "std.dif"
-  data.plot$contrast <- c(rep(1, n_covs), rep(2, n_covs))
-  data.plot$contrast <- factor(data.plot$contrast, levels = c(1,2), labels = c("Unweighted", "Balancing Weights"))
-  data.plot$covariate <- as.factor(var_names)
+  # ## Balance Subset
+  # rownames(um.wt.tab) <- bal.names
+  # rownames(bal.st.tab) <- bal.names
+  # 
+  # lg.un <-  um.wt.tab[which(abs(um.wt.tab[,3]) > 0.2),] # large unweighted (0.2)
+  # lg.wt <- bal.st.tab[which(abs(um.wt.tab[,3]) > 0.2),]
+  # 
+  # ### Plots and Tables
+  # n_covs <- nrow(lg.un)
+  # # var_names <- covs[covs != "-1"] # use if plotting all covariates
+  # all(row.names(lg.un) == row.names(lg.wt))
+  # var_names <- rownames(lg.un)
+  # 
+  # #### Balance Plot
+  # data.plot <- c(lg.un[,3], lg.wt[,3])
+  # data.plot <- as.data.frame(data.plot)
+  # names(data.plot) <- "std.dif"
+  # data.plot$contrast <- c(rep(1, n_covs), rep(2, n_covs))
+  # data.plot$contrast <- factor(data.plot$contrast, levels = c(1,2), labels = c("Unweighted", "Balancing Weights"))
+  # data.plot$covariate <- as.factor(var_names)
 
   
   # Outcomes for weighting
@@ -291,25 +291,25 @@ logisticIPW <- function(data, true_att, feat_rep, verbose = FALSE) {
   }
   
   ## Balance Subset
-  rownames(um.wt.tab) <- bal.names
-  rownames(bal.ip.tab) <- bal.names
-  
-  lg.un <-  um.wt.tab[which(abs(um.wt.tab[,3]) > 0.2),] # large unweighted (0.2)
-  lg.ip <- bal.ip.tab[which(abs(um.wt.tab[,3]) > .2),]
-  
-  ### Plots and Tables
-  n_covs <- nrow(lg.un)
-  # var_names <- covs[covs != "-1"] # use if plotting all covariates
-  all(row.names(lg.un) == row.names(lg.ip))
-  var_names <- rownames(lg.un)
-  
-  #### Balance Plot
-  data.plot <- c(lg.un[,3], lg.ip[,3])
-  data.plot <- as.data.frame(data.plot)
-  names(data.plot) <- "std.dif"
-  data.plot$contrast <- c(rep(1, n_covs), rep(2, n_covs))
-  data.plot$contrast <- factor(data.plot$contrast, levels = c(1,2), labels = c("Unweighted", "IPW"))
-  data.plot$covariate <- as.factor(var_names)
+  # rownames(um.wt.tab) <- bal.names
+  # rownames(bal.ip.tab) <- bal.names
+  # 
+  # lg.un <-  um.wt.tab[which(abs(um.wt.tab[,3]) > 0.2),] # large unweighted (0.2)
+  # lg.ip <- bal.ip.tab[which(abs(um.wt.tab[,3]) > .2),]
+  # 
+  # ### Plots and Tables
+  # n_covs <- nrow(lg.un)
+  # # var_names <- covs[covs != "-1"] # use if plotting all covariates
+  # all(row.names(lg.un) == row.names(lg.ip))
+  # var_names <- rownames(lg.un)
+  # 
+  # #### Balance Plot
+  # data.plot <- c(lg.un[,3], lg.ip[,3])
+  # data.plot <- as.data.frame(data.plot)
+  # names(data.plot) <- "std.dif"
+  # data.plot$contrast <- c(rep(1, n_covs), rep(2, n_covs))
+  # data.plot$contrast <- factor(data.plot$contrast, levels = c(1,2), labels = c("Unweighted", "IPW"))
+  # data.plot$covariate <- as.factor(var_names)
   
   
   #setwd("~/Dropbox/Bal-Weights/draft/educ/figures")
