@@ -16,18 +16,27 @@ library(foreach)
 library(doParallel)
 library(parallel)
 library(furrr)
+
+log_filename = "sim2-keele.txt"
+
+write("", file = log_filename)  # Clears the file before running
+
 numCores <- as.numeric(Sys.getenv('SLURM_CPUS_PER_TASK'))
 plan(multisession, workers = numCores)
 
 
-write("", file = "sim2-keele.txt")  # Clears the file before running
+log_message <- paste("Number of Cores Initialized:", numCores, "at", Sys.time(), "\n")
+cat(log_message, file = log_filename, append = TRUE)
+
+
 
 source("utils-keele.R")
 source("fitSplines.R")
 source("randomForestFeatures.R")
 source("estimationFunctions-keele.R")
 source("shen-eval-funcs.R")
-print("External scripts loaded")
+log_message <- paste("Functions loaded at", Sys.time(), "\n")
+cat(log_message, file = log_filename, append = TRUE)
 
 make_data <- function(n,c, treat.true){
   
@@ -59,18 +68,26 @@ set.seed(23967)
 
 scenarios = expand_grid(c = c(1, 2.5, 5, 7.5, 10))
 
-print("Starting simulations...")
+log_message <- paste("Starting", sim_reps, "simulations at", Sys.time(), "\n")
+cat(log_message, file = log_filename, append = TRUE)
 
 run_scenario = function( c ) {
   
   log_message <- paste("Starting Simulation:", c, "at", Sys.time(), "\n")
-  cat(log_message, file = "sim2-keele.txt", append = TRUE)
+  cat(log_message, file = log_filename, append = TRUE)
   
   # Run the Simulation              
-  reps_qs0 = map( 1:sim_reps, function( id ) {
-    if (id %% 20 == 0) cat(paste("Starting simulation", id, "for overlap", c, "at", Sys.time(), "\n"), file = "sim2-keele.txt", append = TRUE)
+  reps_qs0 = future_map( 1:sim_reps, function( id ) {
+    if (id <= 20) cat(paste("Starting simulation", id, "for overlap", c, "at", Sys.time(), "\n"), 
+                      file = log_filename, append = TRUE)
+    if (id > 975) cat(paste("Starting simulation", id, "for overlap", c, "at", Sys.time(), "\n"), 
+                      file = log_filename, append = TRUE)
+    if (id %% 20 == 0) cat(paste("Starting simulation", id, "for overlap", c, "at", Sys.time(), "\n"), 
+                           file = log_filename, append = TRUE)
+    
     bdat  = make_data( 1000, c = c, treat.true=5 )
-    pilot.dat <- make_data(200, c=c, treat.true=5 ) %>% dplyr::filter(Z == 0)
+    pilot.dat <- make_data(300, c=c, treat.true=5 ) %>% dplyr::filter(Z == 0)
+    
     edat = eval_data(dat=bdat, pilot.dat=pilot.dat, treat.true=5, verbose = FALSE)
     #edat$id = id
     #edat
@@ -79,10 +96,10 @@ run_scenario = function( c ) {
       dplyr::bind_rows(resi)
     })
     dplyr::bind_rows(out) %>% dplyr::mutate(id = id)
-  }) 
+  }, .progress = TRUE) 
   
-  cat(paste0("Sim ", c, " done\n"), file = "sim2-keele.txt", append = TRUE)
-  dplyr::bind_rows(reps_qs0)
+  # cat(paste0("Sim ", c, " done\n"), file = log_filename, append = TRUE)
+  return(dplyr::bind_rows(reps_qs0))
 }
 
 
@@ -93,10 +110,17 @@ t_fexact <- system.time({
 
 })
 
-save(scenarios, file="simulation-2-keele.RData")
-print("saved file")
+save(scenarios, file="simulation-2-keele-temp.RData")
 
-# time required for computation, in minutes
-time <- t_fexact[['elapsed']]/60
-cat("Time in minutes: ", time, "\n")
+filename <- paste0("simulation-2-keele-", sim_reps, ".RData")
+
+# print("saved file")
+# 
+# # time required for computation, in minutes
+# time <- t_fexact[['elapsed']]/60
+# cat("Time in minutes: ", time, "\n")
+
+save(scenarios, file=filename)
+
+
 

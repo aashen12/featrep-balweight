@@ -37,6 +37,8 @@ extract_rf_features <- function(rf_model, data, n_components=10, verbose = FALSE
   # Combine all encodings
   leaf_encoding <- do.call(cbind, encoding_list)
   
+  leaf_encoding <- scale(leaf_encoding, center = TRUE, scale = TRUE)
+  
   # Perform truncated SVD
   if (verbose) print(paste("Finished creating matrix. Running SVD."))
   svd_result <- irlba(leaf_encoding, nv=n_components, maxit = 2000, verbose = F)

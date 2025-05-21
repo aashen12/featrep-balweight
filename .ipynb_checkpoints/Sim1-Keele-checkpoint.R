@@ -7,7 +7,7 @@ library(geepack)
 library(GenericML)
 library(WeightIt)
 library(glmnet)
-
+library(kbal)
 
 rm(list=ls())
 
@@ -22,7 +22,7 @@ library(foreach)
 library(doParallel)
 library(parallel)
 library(furrr)
-sink("sim1-keele.txt", append = FALSE)   ##### ADDED (overwrite existing file)
+write("", "sim1-keele.txt", append = FALSE)   ##### ADDED (overwrite existing file)
 
 
 numCores <- as.numeric(Sys.getenv('SLURM_CPUS_PER_TASK'))
@@ -47,20 +47,23 @@ make_data <- function(n,c, treat.true){
 }
 
 ### Sim Run
-sim_reps = 1000
+sim_reps = 100
 set.seed(23967)
 
 scenarios = expand_grid(c = c(1, 2.5, 5, 7.5, 10))
 
 run_scenario = function( c ) {
   
-  print(paste("Starting Simulation: ", c))
+  log_message <- paste("Starting Simulation:", c, "at", Sys.time(), "\n")
+  cat(log_message, file = "sim1-keele.txt", append = TRUE)
   
   
   # Run the Simulation              
-  reps_qs0 = map( 1:sim_reps, function( id ) {
-    bdat  = make_data( 1000, c, treat.true=5 )
-    edat = eval_data(dat=bdat, treat.true=5, verbose = FALSE)
+  reps_qs0 = future_map( 1:sim_reps, function( id ) {
+    if (id %% 20 == 0) cat(paste("Starting simulation", id, "for overlap", c, "at", Sys.time(), "\n"), file = "sim1-keele.txt", append = TRUE)
+    bdat  = make_data( 1000, c=c, treat.true=5 )
+    pilot.dat <- make_data(200, c=c, treat.true=5 ) %>% dplyr::filter(Z == 0)
+    edat = eval_data(dat=bdat, pilot.dat=pilot.dat, treat.true=5, verbose = FALSE)
     #edat$id = id
     #edat
     out <- lapply(1:length(edat), function(i) {
@@ -81,12 +84,15 @@ t_fexact <- system.time({
 
 })
 
-save(scenarios, file="simulation-1-keele.RData")
-cat("saved file")
+save(scenarios, file="simulation-1-keele-temp.RData")
+
+filename <- paste0("simulation-1-keele-", sim_reps, ".RData")
+
+save(scenarios, file=filename)
+print("saved file")
 
 
 # time required for computation, in minutes
 time <- t_fexact[['elapsed']]/60
 cat("Time in minutes: ", time, "\n")
 
-sink()

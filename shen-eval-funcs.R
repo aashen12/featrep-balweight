@@ -12,13 +12,14 @@ eval_data <- function(dat, pilot.dat, treat.true = 5, verbose = FALSE) {
   data <- rbind(data.t, data.c)
   # gets rid of the training sample used to select interactions & nonlinear covariates
   
-  covs <- c("X1","X2", "X3", "X4", "X5")
-  covs_gam_mod <- covs
-  gam_fit <- fit_gam(data.c.train, covs_gam = covs_gam_mod, cutoff = 3)
-  nonlinear_covs <- gam_fit$nonlinear_covs
-  if (verbose) {
-    print("gam fitted")
-  }
+  covs <- names(dat)[!names(dat) %in% c("Z", "Y")]
+  
+  # covs_gam_mod <- covs
+  # gam_fit <- fit_gam(data.c.train, covs_gam = covs_gam_mod, cutoff = 3)
+  # nonlinear_covs <- gam_fit$nonlinear_covs
+  # if (verbose) {
+  #   print("gam fitted")
+  # }
   ############################################################################
   
   
@@ -39,27 +40,32 @@ eval_data <- function(dat, pilot.dat, treat.true = 5, verbose = FALSE) {
   
   
   #### Generate Random Forest features #####
-  nc_rf <- c(10, 20, 50, 100)
+  nc_rf <- c(10, 25, 50, 100, 150)#, 200)
   rf.scenarios <- expand.grid(fr = c("rf_only", "rf_plus"), ncomp = nc_rf)
   ## First, run random forest
   
   form <- reformulate(covs, response = "Y")
   rfmod <- randomForest(form, data = data.c.train, ntree = 100)
   
+  rf_obj <- extract_rf_features(rf_model = rfmod, data = data, n_components = max(nc_rf), verbose = TRUE)
+  
+  data_rf_only_whole <- rf_obj$features %>% dplyr::mutate(Y = data$Y, treat = data$Z)
+  data_rf_plus_whole <- rf_obj$data_rf
+  
   # Next, extract feat reps
-  all_rf <- lapply(nc_rf, function(nc) {
-    rf_obj <- extract_rf_features(rf_model = rfmod, data = data, n_components = nc, verbose = TRUE)
-    data_rf_only <- rf_obj$features %>% 
-      dplyr::mutate(Y = data$Y, treat = data$Z)
-    var_exp <- rf_obj$explained_variance
-    data_rf_plus <- rf_obj$data_rf
-    ol <- list(
-      data_rf_only = data_rf_only,
-      data_rf_plus = data_rf_plus
-    )
-    ol
-  })
-  names(all_rf) <- paste0("rf_", nc_rf)
+  # all_rf <- lapply(nc_rf, function(nc) {
+  #   rf_obj <- extract_rf_features(rf_model = rfmod, data = data, n_components = nc, verbose = TRUE)
+  #   data_rf_only <- rf_obj$features %>%
+  #     dplyr::mutate(Y = data$Y, treat = data$Z)
+  #   var_exp <- rf_obj$explained_variance
+  #   data_rf_plus <- rf_obj$data_rf
+  #   ol <- list(
+  #     data_rf_only = data_rf_only,
+  #     data_rf_plus = data_rf_plus
+  #   )
+  #   ol
+  # })
+  # names(all_rf) <- paste0("rf_", nc_rf)
   ############################################################################
   
   ############################# Extract Gaussian Kernel Features #################################
@@ -68,7 +74,6 @@ eval_data <- function(dat, pilot.dat, treat.true = 5, verbose = FALSE) {
   # scale to have variance 1 but not mean 0
   X <- scale(X_unscaled)
   kbal_objs <- lapply(1:length(nc_rf), function(i) {
-    print(i)
     nc <- nc_rf[i]
     kbal_obj <- kbal::kbal(X, treatment = data$Z, numdims = nc)
     data_kbal_only <-  data.frame(
@@ -98,9 +103,11 @@ eval_data <- function(dat, pilot.dat, treat.true = 5, verbose = FALSE) {
     if (fr == "raw") {
       dataset <- data
     } else if (fr == "rf_plus") {
-      dataset <- all_rf[[paste0("rf_", nc)]]$data_rf_plus
+      input_covs <- c(covs, paste0("PC", 1:nc))
+      dataset <- data_rf_plus_whole %>% dplyr::select(Z, Y, all_of(input_covs))
     } else if (fr == "rf_only") {
-      dataset <- all_rf[[paste0("rf_", nc)]]$data_rf_only
+      input_covs <- c(paste0("PC", 1:nc))
+      dataset <- data_rf_plus_whole %>% dplyr::select(Z, Y, all_of(input_covs))
     } else if (fr == "spline") {
       dataset <- spline_dfs[[paste0("spline_", nc)]]
     } else if (fr == "kbal_only") {
@@ -110,14 +117,30 @@ eval_data <- function(dat, pilot.dat, treat.true = 5, verbose = FALSE) {
     }
      
     # compute ATT, balance metrics, error metrics, and so forth for each estimator 
-    bw_l2 <- balancingWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, type = "l2", verbose = FALSE)
-    bw_inf <- balancingWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, type = "inf", verbose = FALSE)
-    ipw <- logisticIPW(data = dataset, true_att = treat.true, feat_rep = feat_rep, verbose = FALSE)
-    aug.l2 <- augmentedBalWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, out.mod = "ridge", ps.mod = "l2", verbose = FALSE)
-    aug.inf <- augmentedBalWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, out.mod = "lasso", ps.mod = "inf", verbose = FALSE)
-    aug.vanilla <- augmentedBalWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, out.mod = "ols", ps.mod = "ipw", verbose = FALSE)
+    
+    bw_l2 <- balancingWeights(data = dataset, true_att = treat.true, 
+                              feat_rep = feat_rep, type = "l2", 
+                              simplex = TRUE, verbose = FALSE) # simplex
+    
+    bw_inf <- balancingWeights(data = dataset, true_att = treat.true, 
+                               feat_rep = feat_rep, type = "l2", 
+                               simplex = FALSE, verbose = FALSE) # no simplex
+    
+    ipw <- logisticIPW(data = dataset, true_att = treat.true, 
+                       feat_rep = feat_rep, verbose = FALSE)
+    
+    rf <- outcomeRegression(data = dataset, true_att = treat.true, 
+                            feat_rep = feat_rep, type = "rf", verbose = FALSE)
+    
+    aug.l2 <- augmentedBalWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, 
+                                  out.mod = "ols", ps.mod = "l2", verbose = FALSE)
+    aug.vanilla <- augmentedBalWeights(data = dataset, true_att = treat.true, feat_rep = feat_rep, 
+                                       out.mod = "ols", ps.mod = "ipw", verbose = FALSE)
+    
+    
     list(bw_l2 = bw_l2, bw_inf = bw_inf, ipw = ipw, 
-         aug.l2 = aug.l2, aug.inf = aug.inf, aug.vanilla = aug.vanilla)#, var_exp = var_exp)
+         rf = rf,
+         aug.l2 = aug.l2, aug.vanilla = aug.vanilla)
   })
   out
 }

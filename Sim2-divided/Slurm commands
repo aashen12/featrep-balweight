@@ -1,0 +1,7 @@
+sbatch sim2-divided.sh low
+sbatch sim2-divided.sh med
+sbatch sim2-divided.sh high
+
+
+
+for p in 1 2.5 5 7.5 10; do sbatch sim2-single.sh "$p"; done

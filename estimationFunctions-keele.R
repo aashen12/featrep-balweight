@@ -68,7 +68,7 @@ sbw_osqp <- function(X, Z, tol, ...) {
 
 
 
-balancingWeights <- function(data, true_att, feat_rep, type = "l2", verbose = FALSE) {
+balancingWeights <- function(data, true_att, feat_rep, type = "l2", simplex = TRUE, verbose = FALSE) {
   # l2 or inf
   #print(paste("True ATT:", round(true_att, 3)))
   if ("Z" %in% colnames(data)) {
@@ -77,16 +77,31 @@ balancingWeights <- function(data, true_att, feat_rep, type = "l2", verbose = FA
   }
   
   covs <- names(data)[!names(data) %in% c("Y", "treat")]
+  print(covs)
   basis <- c(covs, "-1")
-  X <- scale(model.matrix(reformulate(basis), data))
+  
+  contains_rf_only <- grepl("rf_only", feat_rep)
+  if (contains_rf_only) {
+    X <- model.matrix(reformulate(basis), data)
+    # X <- scale(model.matrix(reformulate(basis), data))
+  } else {
+    X <- scale(model.matrix(reformulate(basis), data))
+  }
+  
   trt <- data$treat
   n <- nrow(data)
   
   if (type == "l2") {
     # balancing weights
     l <- estimate_regularization(data, covs = covs)
-    bal_weights <- multilevel_qp(X, trt, Z = rep(1,n), lambda = l, verbose= FALSE,
-                                 exact_global = FALSE, scale_sample_size = FALSE)
+    if (simplex) {
+      bal_weights <- multilevel_qp(X, trt, Z = rep(1,n), lambda = l, verbose= FALSE,
+                                   exact_global = FALSE, scale_sample_size = FALSE)
+    } else {
+      bal_weights <- multilevel_qp(X, trt, Z = rep(1,n), lambda = l, verbose= FALSE,
+                                   exact_global = FALSE, scale_sample_size = FALSE,
+                                   lowlim = -Inf, uplim = Inf)
+    }
     data$wts <- pmax(bal_weights$weights, 0)
   } else if (type == "inf") {
     bal_weights <- sbw_osqp(X, Z = trt, tol = 1.75)
@@ -151,28 +166,6 @@ balancingWeights <- function(data, true_att, feat_rep, type = "l2", verbose = FA
     print("PBR calculated")
   }
   
-  # ## Balance Subset
-  # rownames(um.wt.tab) <- bal.names
-  # rownames(bal.st.tab) <- bal.names
-  # 
-  # lg.un <-  um.wt.tab[which(abs(um.wt.tab[,3]) > 0.2),] # large unweighted (0.2)
-  # lg.wt <- bal.st.tab[which(abs(um.wt.tab[,3]) > 0.2),]
-  # 
-  # ### Plots and Tables
-  # n_covs <- nrow(lg.un)
-  # # var_names <- covs[covs != "-1"] # use if plotting all covariates
-  # all(row.names(lg.un) == row.names(lg.wt))
-  # var_names <- rownames(lg.un)
-  # 
-  # #### Balance Plot
-  # data.plot <- c(lg.un[,3], lg.wt[,3])
-  # data.plot <- as.data.frame(data.plot)
-  # names(data.plot) <- "std.dif"
-  # data.plot$contrast <- c(rep(1, n_covs), rep(2, n_covs))
-  # data.plot$contrast <- factor(data.plot$contrast, levels = c(1,2), labels = c("Unweighted", "Balancing Weights"))
-  # data.plot$covariate <- as.factor(var_names)
-
-  
   # Outcomes for weighting
   bal.wt <- geeglm(Y ~ treat, data = data, std.err = 'san.se', 
                          weights = wts, id=1:nrow(data),
@@ -203,8 +196,12 @@ balancingWeights <- function(data, true_att, feat_rep, type = "l2", verbose = FA
   if (bias.bw > 3) {
     warning("Bias is large for balancing weights. Caution advised.")
   }
-  
-  data.frame(est = paste("bw", type, sep = "_"), "feat_rep" = feat_rep, 
+  if (type == "l2") {
+    est_final = ifelse(simplex, "bw.simp", "bw.nosimp")
+  } else {
+    est_final = "bw.inf"
+  }
+  data.frame(est = est_final, "feat_rep" = feat_rep, 
              "bias" = bias.bw, "cvg" = coverage.bw, 
              "pbr" = pbr.bal.wt, "ess" = n.0, "est.att" = sr.att.bw)
 }
@@ -290,42 +287,6 @@ logisticIPW <- function(data, true_att, feat_rep, verbose = FALSE) {
     print("PBR calculated")
   }
   
-  ## Balance Subset
-  # rownames(um.wt.tab) <- bal.names
-  # rownames(bal.ip.tab) <- bal.names
-  # 
-  # lg.un <-  um.wt.tab[which(abs(um.wt.tab[,3]) > 0.2),] # large unweighted (0.2)
-  # lg.ip <- bal.ip.tab[which(abs(um.wt.tab[,3]) > .2),]
-  # 
-  # ### Plots and Tables
-  # n_covs <- nrow(lg.un)
-  # # var_names <- covs[covs != "-1"] # use if plotting all covariates
-  # all(row.names(lg.un) == row.names(lg.ip))
-  # var_names <- rownames(lg.un)
-  # 
-  # #### Balance Plot
-  # data.plot <- c(lg.un[,3], lg.ip[,3])
-  # data.plot <- as.data.frame(data.plot)
-  # names(data.plot) <- "std.dif"
-  # data.plot$contrast <- c(rep(1, n_covs), rep(2, n_covs))
-  # data.plot$contrast <- factor(data.plot$contrast, levels = c(1,2), labels = c("Unweighted", "IPW"))
-  # data.plot$covariate <- as.factor(var_names)
-  
-  
-  #setwd("~/Dropbox/Bal-Weights/draft/educ/figures")
-  
-  
-  #pdf("overall-balance.pdf", width=8, height=12, onefile=FALSE, paper="special")
-  # p <- ggplot(data=data.plot, aes(x=,(std.dif), y=covariate, color=factor(contrast)))  + 
-  #   geom_point(size=3) + 
-  #   scale_shape_manual(name= "Contrast", values=c(1,12, 20)) + 
-  #   xlab("Standardized Difference") + ylab("Covariates") +
-  #   scale_y_discrete(limits = rev(levels(data.plot$covariate))) +
-  #   geom_vline(xintercept= 0) +
-  #   geom_vline(xintercept= 0.2, linetype = "dashed") +
-  #   geom_vline(xintercept= -0.2, linetype = "dashed") +
-  #   theme_bw()
-  
   # Outcomes for weighting
   ipw.wt <- bw <- geeglm(Y ~ treat, data = data, std.err = 'san.se', 
                          weights = ip.wts, id=1:nrow(data),
@@ -336,7 +297,7 @@ logisticIPW <- function(data, true_att, feat_rep, verbose = FALSE) {
   sr.att.ipw # singly robust
   
   bias.ipw <- sr.att.ipw - true_att
-  coverage.ipw <- true_att >= att.ipw["lcl.treat"] & true_att <= att.ipw["ucl.treat"]
+  coverage.ipw <- (true_att >= att.ipw["lcl.treat"]) & (true_att <= att.ipw["ucl.treat"])
   names(coverage.ipw) <- NULL
   
   if (verbose) {
@@ -388,6 +349,17 @@ outcomeRegression <- function(data, true_att, feat_rep, type = "ols", verbose = 
     est.att <- mean(data$Y[trt == 1]) - mean(preds)
     bias <- est.att - true_att
     coverage <- NA
+  } else if (type == "rf") {
+    input_data <- data
+    outcome <- "Y"
+    data.0 <- input_data %>% filter(treat == 0) %>% dplyr::select(-treat)
+    data.1 <- input_data %>% filter(treat == 1) %>% dplyr::select(-treat)
+    rfmod <- randomForest::randomForest(as.formula(paste(outcome, "~ .")), 
+                                        data = data.0, ntree=500)
+    rf_pred <- predict(rfmod, newdata = data.1)
+    est.att <- mean(data.1[[outcome]]) - mean(rf_pred)
+    bias <- est.att - true_att
+    coverage <- NA
   }
   if (verbose) {
     print("simulation finished")
@@ -428,8 +400,9 @@ augmentedBalWeights <- function(data, true_att, feat_rep, out.mod = "ols", ps.mo
     }
   } else if (ps.mod == "ipw") {
     ps.glm <- glm(reformulate(covs[covs != "-1"], response = "treat"), data, family = "binomial")
-    ps <- predict(ps.glm, newdata = data, type = "response")
-    data$wts <- ifelse(data$treat == 1, 1, ps / (1 - ps))
+    pscore <- predict(ps.glm, newdata = data, type = "response")
+    pscore <- pmax (0.05, pmin (0.95, pscore))
+    data$wts <- ifelse(data$treat == 1, 1, pscore / (1 - pscore))
     if (verbose) {
       print("ipw weights estimated")
     }

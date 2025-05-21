@@ -11,18 +11,18 @@ library(kbal)
 
 rm(list=ls())
 
-source("utils-keele.R")
-source("fitSplines.R")
-source("randomForestFeatures.R")
-source("estimationFunctions-keele.R")
-source("shen-eval-funcs.R")
+source("../utils-keele.R")
+source("../fitSplines.R")
+source("../randomForestFeatures.R")
+source("../estimationFunctions-keele.R")
+source("../shen-eval-funcs.R")
 
 library(doFuture)
 library(foreach)
 library(doParallel)
 library(parallel)
 library(furrr)
-write("", "sim1-keele.txt", append = FALSE)   ##### ADDED (overwrite existing file)
+write("", "sim1-keele-overlap1.txt", append = FALSE)   ##### ADDED (overwrite existing file)
 
 
 numCores <- as.numeric(Sys.getenv('SLURM_CPUS_PER_TASK'))
@@ -50,17 +50,17 @@ make_data <- function(n,c, treat.true){
 sim_reps = 1000
 set.seed(23967)
 
-scenarios = expand_grid(c = c(1, 2.5, 5, 7.5, 10))
+scenarios = expand_grid(c = 1)
 
 run_scenario = function( c ) {
   
   log_message <- paste("Starting Simulation:", c, "at", Sys.time(), "\n")
-  cat(log_message, file = "sim1-keele.txt", append = TRUE)
+  cat(log_message, file = "sim1-keele-overlap1.txt", append = TRUE)
   
   
   # Run the Simulation              
-  reps_qs0 = future_map( 1:sim_reps, function( id ) {
-    if (id %% 20 == 0) cat(paste("Starting simulation", id, "for overlap", c, "at", Sys.time(), "\n"), file = "sim1-keele.txt", append = TRUE)
+  reps_qs0 = map( 1:sim_reps, function( id ) {
+    if (id %% 20 == 0) cat(paste("Starting simulation", id, "for overlap", c, "at", Sys.time(), "\n"), file = "sim1-keele-overlap1.txt", append = TRUE)
     bdat  = make_data( 1000, c=c, treat.true=5 )
     pilot.dat <- make_data(200, c=c, treat.true=5 ) %>% dplyr::filter(Z == 0)
     edat = eval_data(dat=bdat, pilot.dat=pilot.dat, treat.true=5, verbose = FALSE)
@@ -69,9 +69,9 @@ run_scenario = function( c ) {
     out <- lapply(1:length(edat), function(i) {
       resi <- edat[[i]]
       dplyr::bind_rows(resi)
-      })
+    })
     dplyr::bind_rows(out) %>% dplyr::mutate(id = id)
-    }) 
+  }) 
   #cat("Sim Done")
   dplyr::bind_rows(reps_qs0)
 }
@@ -81,14 +81,14 @@ run_scenario = function( c ) {
 t_fexact <- system.time({ 
   
   scenarios$res = future_pmap( scenarios, run_scenario )
-
+  
 })
 
-save(scenarios, file="simulation-1-keele.RData")
+save(scenarios, file="simulation-1-keele-temp.RData")
+
+filename <- paste0("simulation-1-keele-", sim_reps, "-overlap1", ".RData")
+
+save(scenarios, file=filename)
 print("saved file")
 
-
-# time required for computation, in minutes
-time <- t_fexact[['elapsed']]/60
-cat("Time in minutes: ", time, "\n")
 

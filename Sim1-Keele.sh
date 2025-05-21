@@ -3,8 +3,8 @@
 #SBATCH --mail-user=aashen@berkeley.edu
 #SBATCH --output=slurm_output/%x_%j.o  # Output file
 #SBATCH --error=slurm_output/%x_%j.e   # Error file
-#SBATCH -c 5
-#SBATCH -p high
+#SBATCH -c 10
+#SBATCH -p jsteinhardt
 
 # Run the R script
 Rscript Sim1-Keele.R
