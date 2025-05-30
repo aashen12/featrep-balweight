@@ -9,4 +9,3 @@ for sim in 3 1; do for o in 1 2.5 5 7.5 10; do sbatch sims-single.sh "$o" "$sim"
 sbatch sims-imai.sh
 
 
-Github token: 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
