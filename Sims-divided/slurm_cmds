@@ -6,6 +6,8 @@ sbatch sims-single.sh 2.5 3
 
 for sim in 3 1; do for o in 1 2.5 5 7.5 10; do sbatch sims-single.sh "$o" "$sim"; done; done
 
+for o in 30 100; do sbatch sims-jose.sh "$o"; done
+
 sbatch sims-imai.sh
 
 

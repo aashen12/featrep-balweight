@@ -24,15 +24,17 @@ library(doParallel)
 library(parallel)
 library(furrr)
 
+args <- commandArgs(trailingOnly = TRUE)
+print(args)
+overlap <- as.numeric(args[1])
+
 
 out_filename <- paste0("logs/sim-jose-", overlap, "-", format(Sys.time(), "%b-%d-%X-%Y"), ".txt")
 
 write("", out_filename, append = FALSE)   ##### ADDED (overwrite existing file)
 
-make_data <- function(n, overlap = "strong") {
+make_data <- function(n, sig.ep) {
   # Generate ZZ variables from standard normal distribution
-  
-  sig.ep <- ifelse(overlap == "strong", 100, 30)
   #print(sig.ep)
   sig.123 <- diag(c(2,1,1))
   sig.123[1,2] <- 1; sig.123[1,3] <- -1; sig.123[2,3] <- -0.5;
@@ -53,7 +55,7 @@ make_data <- function(n, overlap = "strong") {
   return(list(out.df=out.df, true.att = 0))
 }
 
-d <- make_data(n, overlap = overlap)
+d <- make_data(n=12, sig.ep = overlap)
 d$out.df
 
 numCores <- as.numeric(Sys.getenv('SLURM_CPUS_PER_TASK'))
@@ -76,10 +78,10 @@ run_scenario = function() {
     if (id > 975) cat(paste("Starting simulation", id, "at", Sys.time(), "\n"), file = out_filename, append = TRUE) 
     if (id %% 20 == 0) cat(paste("Starting simulation", id, "at", Sys.time(), "\n"), file = out_filename, append = TRUE)
     
-    bdat.obj  = make_data(1000, overlap = overlap)
+    bdat.obj  = make_data(n = 1000, sig.ep = overlap)
     bdat <- bdat.obj$out.df
     
-    pilot.dat.obj <- make_data(1000, overlap = overlap) # 1000 typically
+    pilot.dat.obj <- make_data(n = 1000, sig.ep = overlap) # 1000 typically
     pilot.dat <- pilot.dat.obj$out.df %>% dplyr::filter(Z == 0)
     
     true.att.bdat <- bdat.obj$true.att
