@@ -3,7 +3,7 @@
 #SBATCH --mail-user=aashen@berkeley.edu
 #SBATCH --output=slurm_output/%x_%j.o
 #SBATCH --error=slurm_output/%x_%j.e
-#SBATCH -c 22
-#SBATCH -p jsteinhardt
+#SBATCH -c 21
+#SBATCH -p high
 
 Rscript sims-imai.R

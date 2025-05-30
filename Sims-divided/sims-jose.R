@@ -25,62 +25,36 @@ library(parallel)
 library(furrr)
 
 
-out_filename <- paste0("logs/sim-imai-", format(Sys.time(), "%b-%d-%X-%Y"), ".txt")
+out_filename <- paste0("logs/sim-jose-", overlap, "-", format(Sys.time(), "%b-%d-%X-%Y"), ".txt")
 
 write("", out_filename, append = FALSE)   ##### ADDED (overwrite existing file)
 
-make_data <- function(n) {
+make_data <- function(n, overlap = "strong") {
   # Generate ZZ variables from standard normal distribution
-  ZZ <- MASS::mvrnorm(n, mu = rep(0, 10), Sigma = diag(10))
-  colnames(ZZ) <- paste0("ZZ", 1:10)
   
-  # Define X variables using non-linear transformations of ZZ
-  X1 <- exp(ZZ[, 1] / 2)
-  X2 <- ZZ[, 2] / (1 + exp(ZZ[, 1]))
-  X3 <- (ZZ[, 1] * ZZ[, 3] / 25 + 0.6)^3
-  X4 <- (ZZ[, 2] + ZZ[, 4] + 20)^2
-  X5 <- ZZ[, 5]
-  X6 <- ZZ[, 6]
-  X7 <- ZZ[, 7]
-  X8 <- ZZ[, 8]
-  X9 <- ZZ[, 9]
-  X10 <- ZZ[, 10]
+  sig.ep <- ifelse(overlap == "strong", 100, 30)
+  #print(sig.ep)
+  sig.123 <- diag(c(2,1,1))
+  sig.123[1,2] <- 1; sig.123[1,3] <- -1; sig.123[2,3] <- -0.5;
+  sig.123 <- Matrix::forceSymmetric(sig.123)
+  beta_coef <- c(1,2,-2,-1,-0.5,1)
   
-  # Assemble data frame for covariates
-  X <- data.frame(X1, X2, X3, X4, X5, X6, X7, X8, X9, X10)
+  X.123 <- as.matrix(mvrnorm(n, mu = rep(0,3), Sigma = sig.123))
+  colnames(X.123) <- paste0("X", 1:3)
+  X4 <- runif(n,-3,3)
+  X5 <- rchisq(n,1)
+  X6 <- rbinom(n,1,0.5)
+  X <- cbind(X.123, X4, X5, X6)
+  Z <- ifelse(X %*% matrix(beta_coef, ncol = 1) + rnorm(n,0,sig.ep) > 0, 1, 0)
+  Y <- (X.123[,1] + X.123[,2] + X5)^2 + rnorm(n,0,1)
   
-  # Define eta_3 using Weierstrass function form
-  eta3 <- function(ZZ, a = 2, b = 13, N = 20) {
-    Z_tilde <- (ZZ[,2] + ZZ[,4] + ZZ[,6] + ZZ[,8] + ZZ[,10]) / 5
-    sapply(Z_tilde, function(x) {
-      sum(sapply(0:N, function(n) a^(-n) * cos(b^n * pi * x)))
-    })
-  }
-  
-  
-  # Compute treatment assignment probabilities
-  logits <- -ZZ[, 1] - 0.1 * ZZ[, 4] + eta3(ZZ)
-  prob_Z <- exp(logits) / (1 + exp(logits))
-  Z <- rbinom(n, 1, prob_Z)
-  
-  
-  # Compute outcome variable Y
-  # Assumes ZZ is an n x 10 matrix, and T is a binary vector of length n
-  
-  interaction_term <- 27.4 * ZZ[,1] + 13.7 * ZZ[,2] + 13.7 * ZZ[,3] + 13.7 * ZZ[,4]
-  
-  Y0 <- 200 - 0.5 * interaction_term + rnorm(n)
-  Y1 <- Y0 + 10 + 1.5 * interaction_term
-  Y <- Z*Y1 + (1 - Z)*Y0
-  
-  
-  # Return the full dataset
   out.df <- data.frame(X, Z = Z, Y = Y)
-  true.att <- mean(Y1[Z == 1]) - mean(Y0[Z == 1])
-
-  return(list(out.df=out.df, true.att = true.att))
+  
+  return(list(out.df=out.df, true.att = 0))
 }
 
+d <- make_data(n, overlap = overlap)
+d$out.df
 
 numCores <- as.numeric(Sys.getenv('SLURM_CPUS_PER_TASK'))
 plan(multisession, workers = numCores)
@@ -102,10 +76,10 @@ run_scenario = function() {
     if (id > 975) cat(paste("Starting simulation", id, "at", Sys.time(), "\n"), file = out_filename, append = TRUE) 
     if (id %% 20 == 0) cat(paste("Starting simulation", id, "at", Sys.time(), "\n"), file = out_filename, append = TRUE)
     
-    bdat.obj  = make_data(1000)
+    bdat.obj  = make_data(1000, overlap = overlap)
     bdat <- bdat.obj$out.df
     
-    pilot.dat.obj <- make_data(1000)
+    pilot.dat.obj <- make_data(1000, overlap = overlap) # 1000 typically
     pilot.dat <- pilot.dat.obj$out.df %>% dplyr::filter(Z == 0)
     
     true.att.bdat <- bdat.obj$true.att
@@ -127,9 +101,9 @@ run_scenario = function() {
 
 scenarios <- run_scenario()
 
-save(scenarios, file="simulations-imai-temp.RData")
+save(scenarios, file="simulations-jose-temp.RData")
 
-filename <- paste0("results/simulation-imai-", format(Sys.time(), "%b-%d-%Y"), ".RData")
+filename <- paste0("results/simulation-jose-overlap-", overlap, "-", format(Sys.time(), "%b-%d-%Y"), ".RData")
 
 save(scenarios, file=filename)
 print("saved file")

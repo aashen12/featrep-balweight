@@ -59,7 +59,7 @@ make_data <- function(n) {
   
   
   # Compute treatment assignment probabilities
-  logits <- -ZZ[, 1] - 0.1 * ZZ[, 4] #+ eta3(ZZ)
+  logits <- -ZZ[, 1] - 0.1 * ZZ[, 4] + eta3(ZZ)
   prob_Z <- exp(logits) / (1 + exp(logits))
   Z <- rbinom(n, 1, prob_Z)
   
@@ -105,7 +105,7 @@ run_scenario = function() {
     bdat.obj  = make_data(1000)
     bdat <- bdat.obj$out.df
     
-    pilot.dat.obj <- make_data(1000)
+    pilot.dat.obj <- make_data(1000) # 1000 typically
     pilot.dat <- pilot.dat.obj$out.df %>% dplyr::filter(Z == 0)
     
     true.att.bdat <- bdat.obj$true.att
